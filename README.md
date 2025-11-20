@@ -1,6 +1,4 @@
-Perfect! Here's the **complete README.md content** for your GitHub repository:
 
-```markdown
 # 🎡 Wheel of Fortune with ChatGPT Commentary
 
 Enhanced Wheel of Fortune game with AI-powered ChatGPT commentary system.
