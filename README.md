@@ -15,9 +15,6 @@ Enhanced Wheel of Fortune game with AI-powered ChatGPT commentary system.
 
 ## 🚀 Quick Start
 
-### Option 1: Simple Version (No Setup Required)
-```bash
-python SIMPLE_STARTER.py
 Option 2: Full ChatGPT Version
 # Install dependencies
 pip install openai
