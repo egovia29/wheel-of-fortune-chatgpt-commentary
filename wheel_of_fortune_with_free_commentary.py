@@ -1,4 +1,405 @@
+"""
+Enhanced Wheel of Fortune with FREE Smart Commentary System
+No API keys needed - works immediately!
+"""
+
+import sys
 import random
+import time
+from free_commentary_system import WheelOfFortuneCommentary
+
+# Import existing game components (assuming they exist)
+try:
+    from wheel_of_fortune import WheelOfFortune
+    from smart_player import SmartPlayer, ConservativePlayer, AggressivePlayer
+    from ascii_wheel import display_wheel
+except ImportError:
+    print("⚠️  Some game components not found. Using simplified versions.")
+    
+    # Simplified versions if imports fail
+    class WheelOfFortune:
+        def __init__(self):
+            self.puzzles = [
+                ("WHEEL OF FORTUNE", "TV SHOW"),
+                ("FAMOUS PEOPLE", "BARACK OBAMA"),
+                ("PLACE", "NEW YORK CITY"),
+                ("FOOD AND DRINK", "PIZZA AND SODA")
+            ]
+            self.current_puzzle = None
+            self.current_clue = None
+            self.showing = ""
+            self.guessed_letters = []
+            self.winnings = [0, 0, 0]
+            self.current_player = 0
+            
+        def new_game(self):
+            puzzle, clue = random.choice(self.puzzles)
+            self.current_puzzle = puzzle
+            self.current_clue = clue
+            self.showing = ''.join('_' if c.isalpha() else c for c in puzzle)
+            self.guessed_letters = []
+            self.winnings = [0, 0, 0]
+            self.current_player = 0
+            
+        def spin_wheel(self):
+            values = [500, 600, 700, 800, 900, 1000, -1, 0]  # -1=bankrupt, 0=lose turn
+            return random.choice(values)
+            
+        def guess_letter(self, letter, spin_value):
+            if letter in self.guessed_letters:
+                return 0, "Already guessed"
+                
+            self.guessed_letters.append(letter)
+            count = self.current_puzzle.count(letter.upper())
+            
+            if count > 0:
+                # Update showing
+                new_showing = ""
+                for i, c in enumerate(self.current_puzzle):
+                    if c.upper() == letter.upper():
+                        new_showing += c
+                    else:
+                        new_showing += self.showing[i]
+                self.showing = new_showing
+                
+                # Add winnings
+                if spin_value > 0:
+                    self.winnings[self.current_player] += spin_value * count
+                    
+            return count, "Success"
+            
+        def buy_vowel(self, vowel):
+            if self.winnings[self.current_player] < 250:
+                return False, "Not enough money"
+                
+            self.winnings[self.current_player] -= 250
+            count = self.guess_letter(vowel, 0)[0]
+            return True, f"Found {count} {vowel}'s"
+            
+        def solve_puzzle(self, attempt):
+            return attempt.upper() == self.current_puzzle.upper()
+            
+        def is_solved(self):
+            return '_' not in self.showing
+    
+    class SmartPlayer:
+        def __init__(self, name="Smart"):
+            self.name = name
+            
+        def make_move(self, game_state):
+            return "spin"
+            
+        def choose_letter(self, game_state):
+            common_letters = "RSTLNE"
+            for letter in common_letters:
+                if letter not in game_state.get('guessed_letters', []):
+                    return letter
+            return "A"
+    
+    class ConservativePlayer(SmartPlayer):
+        def __init__(self):
+            super().__init__("Conservative")
+    
+    class AggressivePlayer(SmartPlayer):
+        def __init__(self):
+            super().__init__("Aggressive")
+    
+    def display_wheel(spin_value):
+        print(f"🎡 Wheel Result: ${spin_value}")
+
+class EnhancedWheelOfFortune:
+    """Enhanced Wheel of Fortune with FREE Commentary"""
+    
+    def __init__(self, commentary_style="dramatic", enable_commentary=True):
+        self.game = WheelOfFortune()
+        self.commentary = WheelOfFortuneCommentary(
+            commentary_style=commentary_style,
+            enable_commentary=enable_commentary,
+            delay_range=(0.5, 2)  # Shorter delays for better gameplay
+        )
+        self.players = []
+        
+    def setup_players(self, player_types):
+        """Setup players based on types"""
+        player_classes = {
+            'human': None,  # Human player
+            'smart': SmartPlayer,
+            'conservative': ConservativePlayer,
+            'aggressive': AggressivePlayer
+        }
+        
+        self.players = []
+        for i, player_type in enumerate(player_types):
+            if player_type == 'human':
+                self.players.append(('human', f"Player {i+1}"))
+            else:
+                player_class = player_classes.get(player_type, SmartPlayer)
+                self.players.append((player_class(), f"Player {i+1}"))
+    
+    def display_game_state(self):
+        """Display current game state"""
+        print("\n" + "="*50)
+        print(f"Puzzle: {self.game.showing}")
+        print(f"Clue: {self.game.current_clue}")
+        print(f"Guessed letters: {', '.join(self.game.guessed_letters)}")
+        print(f"Winnings: {self.game.winnings}")
+        print(f"Current player: {self.game.current_player + 1}")
+        print("="*50)
+    
+    def human_turn(self):
+        """Handle human player turn"""
+        print(f"\n🎮 Your turn! Current winnings: ${self.game.winnings[self.game.current_player]}")
+        
+        while True:
+            action = input("Choose action: (s)pin, (b)uy vowel, s(o)lve: ").lower().strip()
+            
+            if action in ['s', 'spin']:
+                return self.handle_spin()
+            elif action in ['b', 'buy']:
+                return self.handle_buy_vowel()
+            elif action in ['o', 'solve']:
+                return self.handle_solve()
+            else:
+                print("Invalid choice. Use 's' for spin, 'b' for buy vowel, 'o' for solve.")
+    
+    def handle_spin(self):
+        """Handle wheel spin"""
+        spin_result = self.game.spin_wheel()
+        
+        print(f"\n🎡 You spun: ", end="")
+        if spin_result == -1:
+            print("BANKRUPT! 💸")
+        elif spin_result == 0:
+            print("Lose a Turn! ⏭️")
+        else:
+            print(f"${spin_result}! 💰")
+        
+        # Commentary for spin
+        self.commentary.wheel_spin_commentary(spin_result, self.game.current_player, self.game.winnings)
+        
+        if spin_result == -1:  # Bankrupt
+            self.game.winnings[self.game.current_player] = 0
+            return False  # End turn
+        elif spin_result == 0:  # Lose turn
+            return False  # End turn
+        else:
+            # Get letter guess
+            while True:
+                letter = input("Guess a consonant: ").upper().strip()
+                if len(letter) == 1 and letter.isalpha() and letter not in 'AEIOU':
+                    break
+                print("Please enter a single consonant (not A, E, I, O, U)")
+            
+            count, message = self.game.guess_letter(letter, spin_result)
+            
+            # Commentary for guess
+            self.commentary.guess_result_commentary(
+                letter, count, spin_result, self.game.showing, 
+                self.game.current_clue, self.game.guessed_letters, 
+                self.game.current_player, self.game.winnings
+            )
+            
+            if count > 0:
+                print(f"✅ Found {count} {letter}'s! Earned ${spin_result * count}!")
+                return True  # Continue turn
+            else:
+                print(f"❌ No {letter}'s in the puzzle.")
+                return False  # End turn
+    
+    def handle_buy_vowel(self):
+        """Handle vowel purchase"""
+        if self.game.winnings[self.game.current_player] < 250:
+            print("❌ Not enough money to buy a vowel! Need $250.")
+            return True  # Continue turn
+        
+        while True:
+            vowel = input("Buy which vowel (A, E, I, O, U): ").upper().strip()
+            if vowel in 'AEIOU' and len(vowel) == 1:
+                break
+            print("Please enter a single vowel (A, E, I, O, U)")
+        
+        success, message = self.game.buy_vowel(vowel)
+        
+        if success:
+            # Commentary for vowel purchase
+            self.commentary.vowel_purchase_commentary(vowel, self.game.current_player, self.game.winnings)
+            print(f"💰 Bought '{vowel}' for $250. {message}")
+            return True  # Continue turn
+        else:
+            print(f"❌ {message}")
+            return True  # Continue turn
+    
+    def handle_solve(self):
+        """Handle puzzle solve attempt"""
+        attempt = input("Enter your solution: ").strip()
+        
+        if self.game.solve_puzzle(attempt):
+            print(f"🏆 CORRECT! You solved: {self.game.current_puzzle}")
+            
+            # Commentary for correct solve
+            self.commentary.solve_attempt_commentary(
+                attempt, True, self.game.current_puzzle, 
+                self.game.current_player, self.game.winnings
+            )
+            
+            return "solved"
+        else:
+            print(f"❌ Incorrect! The answer was: {self.game.current_puzzle}")
+            
+            # Commentary for wrong solve
+            self.commentary.solve_attempt_commentary(
+                attempt, False, self.game.current_puzzle, 
+                self.game.current_player, self.game.winnings
+            )
+            
+            return False  # End turn
+    
+    def ai_turn(self, player):
+        """Handle AI player turn"""
+        print(f"\n🤖 {player.name}'s turn...")
+        time.sleep(1)
+        
+        # Simple AI logic - just spin and guess common letters
+        spin_result = self.game.spin_wheel()
+        
+        print(f"🎡 {player.name} spun: ", end="")
+        if spin_result == -1:
+            print("BANKRUPT! 💸")
+        elif spin_result == 0:
+            print("Lose a Turn! ⏭️")
+        else:
+            print(f"${spin_result}! 💰")
+        
+        # Commentary for AI spin
+        self.commentary.wheel_spin_commentary(spin_result, self.game.current_player, self.game.winnings)
+        
+        if spin_result <= 0:
+            return False  # End turn
+        
+        # AI chooses letter
+        letter = player.choose_letter({'guessed_letters': self.game.guessed_letters})
+        print(f"🤖 {player.name} guesses: {letter}")
+        
+        count, message = self.game.guess_letter(letter, spin_result)
+        
+        # Commentary for AI guess
+        self.commentary.guess_result_commentary(
+            letter, count, spin_result, self.game.showing, 
+            self.game.current_clue, self.game.guessed_letters, 
+            self.game.current_player, self.game.winnings
+        )
+        
+        if count > 0:
+            print(f"✅ Found {count} {letter}'s! Earned ${spin_result * count}!")
+            
+            # AI might try to solve if puzzle is mostly complete
+            if self.game.showing.count('_') <= 3:
+                print(f"🤖 {player.name} attempts to solve...")
+                time.sleep(1)
+                if self.game.solve_puzzle(self.game.current_puzzle):
+                    print(f"🏆 {player.name} solved: {self.game.current_puzzle}")
+                    self.commentary.solve_attempt_commentary(
+                        self.game.current_puzzle, True, self.game.current_puzzle, 
+                        self.game.current_player, self.game.winnings
+                    )
+                    return "solved"
+            
+            return True  # Continue turn
+        else:
+            print(f"❌ No {letter}'s in the puzzle.")
+            return False  # End turn
+    
+    def play_game(self):
+        """Main game loop"""
+        print("🎡 WHEEL OF FORTUNE WITH FREE COMMENTARY!")
+        print("=" * 50)
+        
+        # Start new game
+        self.game.new_game()
+        
+        # Game start commentary
+        self.commentary.game_start_commentary(self.game.current_clue, "Puzzle Category")
+        
+        # Main game loop
+        while not self.game.is_solved():
+            self.display_game_state()
+            
+            # Current player's turn
+            current_player_info = self.players[self.game.current_player]
+            
+            if current_player_info[0] == 'human':
+                # Human turn
+                result = self.human_turn()
+            else:
+                # AI turn
+                result = self.ai_turn(current_player_info[0])
+            
+            # Check if game was solved
+            if result == "solved":
+                break
+            
+            # Check if puzzle is complete
+            if self.game.is_solved():
+                break
+            
+            # Move to next player if turn ended
+            if not result:
+                self.game.current_player = (self.game.current_player + 1) % len(self.players)
+        
+        # Game end
+        self.display_game_state()
+        winner = self.game.current_player
+        print(f"\n🏆 Game Over! Player {winner + 1} wins with ${self.game.winnings[winner]}!")
+        print(f"🎊 The puzzle was: {self.game.current_puzzle}")
+
+def main():
+    """Main function"""
+    if len(sys.argv) < 2:
+        print("Usage: python wheel_of_fortune_with_free_commentary.py <player1> [player2] [player3] [options]")
+        print("Player types: human, smart, conservative, aggressive")
+        print("Options: --style [dramatic|humorous|professional|casual], --no-commentary")
+        print("\nExample: python wheel_of_fortune_with_free_commentary.py human smart conservative --style humorous")
+        return
+    
+    # Parse arguments
+    args = sys.argv[1:]
+    player_types = []
+    commentary_style = "dramatic"
+    enable_commentary = True
+    
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--style" and i + 1 < len(args):
+            commentary_style = args[i + 1]
+            i += 2
+        elif arg == "--no-commentary":
+            enable_commentary = False
+            i += 1
+        elif arg in ['human', 'smart', 'conservative', 'aggressive']:
+            player_types.append(arg)
+            i += 1
+        else:
+            i += 1
+    
+    # Default to 3 players if not enough specified
+    while len(player_types) < 3:
+        player_types.append('smart')
+    
+    # Limit to 3 players
+    player_types = player_types[:3]
+    
+    print(f"🎮 Players: {', '.join(player_types)}")
+    print(f"🎭 Commentary style: {commentary_style}")
+    print(f"🎙️ Commentary: {'Enabled' if enable_commentary else 'Disabled'}")
+    
+    # Create and start game
+    game = EnhancedWheelOfFortune(commentary_style=commentary_style, enable_commentary=enable_commentary)
+    game.setup_players(player_types)
+    game.play_game()
+
+if __name__ == "__main__":
+    main()import random
 import re
 import sys
 import time
